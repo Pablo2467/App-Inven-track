@@ -1,0 +1,514 @@
+openapi: 3.1.0
+info:
+  title: Inven-Track API
+  version: 1.0.0
+  description: |
+    API del sistema de inventario de la salsamentaria Inven-Track.
+    Cambios frente al contrato original: ver sección "Cambios" del README (rol DUENO sin tilde, CRUD con paginación,
+    POST /batches crea lote + entrada, rutas de auth).
+  x-ibm-name: inven-track
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Desarrollo
+security:
+  - bearerAuth: []
+tags:
+  - {name: auth}
+  - {name: products}
+  - {name: suppliers}
+  - {name: batches}
+  - {name: inventory}
+  - {name: stock-entries}
+  - {name: stock-exits}
+  - {name: expiration-alerts}
+  - {name: movements}
+  - {name: users}
+  - {name: dashboard}
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Inicia sesión y devuelve un JWT (8 horas)
+      security: []
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LoginRequest'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/LoginResponse'}}}}
+        '401': {$ref: '#/components/responses/Error'}
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: Usuario autenticado
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}}
+  /auth/change-password:
+    post:
+      tags: [auth]
+      summary: Cambia la contraseña propia
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ChangePasswordRequest'}}}}
+      responses:
+        '200': {description: OK}
+        '400': {$ref: '#/components/responses/Error'}
+  /products:
+    get:
+      tags: [products]
+      summary: Lista productos (paginado). Cualquier usuario autenticado.
+      parameters:
+        - {$ref: '#/components/parameters/Rq'}
+        - {name: q, in: query, schema: {type: string}, description: Nombre, código o categoría}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/Status'}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+        - {$ref: '#/components/parameters/Sort'}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ProductPage'}}}}
+    post:
+      tags: [products]
+      summary: Crea un producto (solo DUENO)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProductRequest'}}}}
+      responses:
+        '201': {description: Creado, content: {application/json: {schema: {$ref: '#/components/schemas/Product'}}}}
+        '400': {$ref: '#/components/responses/Error'}
+        '403': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+  /products/{id}:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      tags: [products]
+      summary: Consulta un producto
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Product'}}}}
+        '404': {$ref: '#/components/responses/Error'}
+    put:
+      tags: [products]
+      summary: Actualiza un producto (solo DUENO)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProductRequest'}}}}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Product'}}}}
+        '409': {$ref: '#/components/responses/Error'}
+    delete:
+      tags: [products]
+      summary: Elimina el producto, o lo desactiva si tiene historial (solo DUENO)
+      responses:
+        '200': {description: DELETED o DEACTIVATED, content: {application/json: {schema: {$ref: '#/components/schemas/Message'}}}}
+  /suppliers:
+    get:
+      tags: [suppliers]
+      summary: Lista proveedores (paginado)
+      parameters:
+        - {name: q, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/Status'}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+      responses:
+        '200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/SupplierPage'}}}}
+    post:
+      tags: [suppliers]
+      summary: Registra un proveedor (solo DUENO)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SupplierRequest'}}}}
+      responses:
+        '201': {description: Creado, content: {application/json: {schema: {$ref: '#/components/schemas/Supplier'}}}}
+        '409': {$ref: '#/components/responses/Error'}
+  /suppliers/{id}:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      tags: [suppliers]
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Supplier'}}}}}
+    put:
+      tags: [suppliers]
+      summary: Actualiza (solo DUENO)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SupplierRequest'}}}}
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Supplier'}}}}}
+    delete:
+      tags: [suppliers]
+      summary: Elimina o desactiva si tiene entradas (solo DUENO)
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Message'}}}}}
+  /batches:
+    get:
+      tags: [batches]
+      summary: Lista lotes (paginado)
+      parameters:
+        - {name: productId, in: query, schema: {type: integer, format: int64}}
+        - {name: supplierId, in: query, schema: {type: integer, format: int64}}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/LotStatus'}}
+        - {name: q, in: query, schema: {type: string}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/LotPage'}}}}}
+    post:
+      tags: [batches]
+      summary: Registra un lote (crea lote + entrada + movimiento). Solo DUENO.
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EntryRequest'}}}}
+      responses: {'201': {description: Creado, content: {application/json: {schema: {$ref: '#/components/schemas/Lot'}}}}}
+  /batches/{id}:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      tags: [batches]
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Lot'}}}}}
+    put:
+      tags: [batches]
+      summary: Corrige número, vencimiento y costo (solo DUENO). Las cantidades no se editan.
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LotUpdate'}}}}
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Lot'}}}}}
+  /inventory:
+    get:
+      tags: [inventory]
+      summary: Existencias por producto activo (semáforo GREEN/YELLOW/RED)
+      parameters:
+        - {name: q, in: query, schema: {type: string}}
+        - {name: days, in: query, schema: {type: integer}, description: Ventana de "próximo a vencer"}
+      responses: {'200': {description: OK, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/InventoryItem'}}}}}}
+  /stock-entries:
+    get:
+      tags: [stock-entries]
+      summary: Historial de entradas
+      parameters:
+        - {name: productId, in: query, schema: {type: integer, format: int64}}
+        - {name: supplierId, in: query, schema: {type: integer, format: int64}}
+        - {name: from, in: query, schema: {type: string, format: date}}
+        - {name: to, in: query, schema: {type: string, format: date}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/EntryPage'}}}}}
+    post:
+      tags: [stock-entries]
+      summary: Registra una entrada (DUENO y EMPLEADA). El responsable sale del token.
+      parameters: [{$ref: '#/components/parameters/Rq'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EntryRequest'}}}}
+      responses:
+        '201': {description: Creado, content: {application/json: {schema: {$ref: '#/components/schemas/Entry'}}}}
+        '400': {$ref: '#/components/responses/Error'}
+  /stock-entries/{id}:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      tags: [stock-entries]
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Entry'}}}}}
+  /stock-exits:
+    get:
+      tags: [stock-exits]
+      summary: Historial de salidas
+      parameters:
+        - {name: productId, in: query, schema: {type: integer, format: int64}}
+        - {name: reason, in: query, schema: {$ref: '#/components/schemas/ExitReason'}}
+        - {name: from, in: query, schema: {type: string, format: date}}
+        - {name: to, in: query, schema: {type: string, format: date}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ExitPage'}}}}}
+    post:
+      tags: [stock-exits]
+      summary: Registra una salida con descuento FIFO, transaccional y con bloqueo de lotes
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ExitRequest'}}}}
+      responses:
+        '201': {description: Creado (incluye los lotes descontados), content: {application/json: {schema: {$ref: '#/components/schemas/Exit'}}}}
+        '409': {description: Existencias insuficientes, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+  /stock-exits/{id}:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      tags: [stock-exits]
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Exit'}}}}}
+  /expiration-alerts:
+    get:
+      tags: [expiration-alerts]
+      summary: Alertas calculadas con las fechas reales de los lotes
+      parameters:
+        - {name: days, in: query, schema: {type: integer}, description: "Por defecto 7"}
+        - {name: type, in: query, schema: {type: string, enum: [EXPIRING, EXPIRED, DEPLETED, LOW_STOCK]}}
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/AlertResponse'}}}}}
+  /movements:
+    get:
+      tags: [movements]
+      summary: Trazabilidad de movimientos
+      parameters:
+        - {name: type, in: query, schema: {type: string, enum: [ENTRY, EXIT]}}
+        - {name: productId, in: query, schema: {type: integer, format: int64}}
+        - {name: userId, in: query, schema: {type: integer, format: int64}}
+        - {name: from, in: query, schema: {type: string, format: date}}
+        - {name: to, in: query, schema: {type: string, format: date}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MovementPage'}}}}}
+  /dashboard:
+    get:
+      tags: [dashboard]
+      summary: Indicadores del panel principal
+      responses: {'200': {description: OK, content: {application/json: {schema: {type: object, additionalProperties: true}}}}}
+  /users:
+    get:
+      tags: [users]
+      summary: Lista usuarios (solo DUENO)
+      parameters:
+        - {name: q, in: query, schema: {type: string}}
+        - {name: role, in: query, schema: {$ref: '#/components/schemas/Role'}}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/Status'}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/UserPage'}}}}}
+    post:
+      tags: [users]
+      summary: Crea un usuario (solo DUENO). La contraseña se guarda con BCrypt.
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UserCreate'}}}}
+      responses: {'201': {description: Creado, content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}}}
+  /users/{id}:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      tags: [users]
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}}}
+    put:
+      tags: [users]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UserUpdate'}}}}
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}}}
+  /users/{id}/status:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    patch:
+      tags: [users]
+      summary: Activa o desactiva un usuario
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [status], properties: {status: {$ref: '#/components/schemas/Status'}}}}}}
+      responses: {'200': {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}}}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+  parameters:
+    Id: {name: id, in: path, required: true, schema: {type: integer, format: int64}}
+    Page: {name: page, in: query, schema: {type: integer, default: 0}}
+    Size: {name: size, in: query, schema: {type: integer, default: 20, maximum: 100}}
+    Sort: {name: sort, in: query, schema: {type: string}, description: "campo,asc|desc"}
+    Rq: {name: X-RqUID, in: header, schema: {type: string}, description: "Opcional. Los encabezados X-Channel y X-ClientDt también se aceptan. X-User-Id, si se envía, debe coincidir con el usuario del token (si no, 403)."}
+  responses:
+    Error: {description: Error, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+  schemas:
+    Status: {type: string, enum: [ACTIVE, INACTIVE]}
+    LotStatus: {type: string, enum: [AVAILABLE, DEPLETED, EXPIRED]}
+    Role: {type: string, enum: [DUENO, EMPLEADA], description: "DUENO = DUEÑO"}
+    ExitReason: {type: string, enum: [SALE, EXPIRED_DISPOSAL, DAMAGE, INTERNAL_USE, OTHER]}
+    Error:
+      type: object
+      properties:
+        timestamp: {type: string, format: date-time}
+        status: {type: integer}
+        error: {type: string}
+        message: {type: string}
+        path: {type: string}
+        details: {type: object, additionalProperties: {type: string}}
+    Message: {type: object, properties: {result: {type: string}, message: {type: string}}}
+    LoginRequest: {type: object, required: [username, password], properties: {username: {type: string}, password: {type: string}}}
+    LoginResponse:
+      type: object
+      properties:
+        token: {type: string}
+        tokenType: {type: string, example: Bearer}
+        expiresInSeconds: {type: integer, example: 28800}
+        user: {$ref: '#/components/schemas/User'}
+    ChangePasswordRequest: {type: object, required: [currentPassword, newPassword], properties: {currentPassword: {type: string}, newPassword: {type: string, minLength: 8}}}
+    ProductRequest:
+      type: object
+      required: [code, name, unit]
+      properties:
+        code: {type: string, maxLength: 40}
+        name: {type: string, maxLength: 150}
+        description: {type: string}
+        category: {type: string}
+        unit: {type: string}
+        minStock: {type: number}
+        status: {$ref: '#/components/schemas/Status'}
+    Product:
+      allOf:
+        - {$ref: '#/components/schemas/ProductRequest'}
+        - type: object
+          properties:
+            id: {type: integer, format: int64}
+            createdAt: {type: string, format: date-time}
+            updatedAt: {type: string, format: date-time}
+    SupplierRequest:
+      type: object
+      required: [name, taxId]
+      properties:
+        name: {type: string}
+        taxId: {type: string}
+        phone: {type: string}
+        email: {type: string, format: email}
+        address: {type: string}
+        status: {$ref: '#/components/schemas/Status'}
+    Supplier:
+      allOf:
+        - {$ref: '#/components/schemas/SupplierRequest'}
+        - type: object
+          properties: {id: {type: integer, format: int64}, createdAt: {type: string, format: date-time}, updatedAt: {type: string, format: date-time}}
+    UserCreate:
+      type: object
+      required: [fullName, email, username, password, role]
+      properties:
+        fullName: {type: string}
+        email: {type: string, format: email}
+        username: {type: string}
+        password: {type: string, minLength: 8, writeOnly: true}
+        role: {$ref: '#/components/schemas/Role'}
+    UserUpdate:
+      type: object
+      required: [fullName, email, role]
+      properties:
+        fullName: {type: string}
+        email: {type: string, format: email}
+        role: {$ref: '#/components/schemas/Role'}
+        password: {type: string, writeOnly: true, description: Opcional}
+    User:
+      type: object
+      description: Nunca incluye contraseña ni hash.
+      properties:
+        id: {type: integer, format: int64}
+        fullName: {type: string}
+        email: {type: string}
+        username: {type: string}
+        role: {$ref: '#/components/schemas/Role'}
+        status: {$ref: '#/components/schemas/Status'}
+        createdAt: {type: string, format: date-time}
+        lastLoginAt: {type: string, format: date-time}
+    EntryRequest:
+      type: object
+      required: [productId, supplierId, quantity]
+      properties:
+        productId: {type: integer, format: int64}
+        supplierId: {type: integer, format: int64}
+        lotNumber: {type: string, description: Opcional; se genera si falta}
+        quantity: {type: number, exclusiveMinimum: 0}
+        entryDate: {type: string, format: date, description: Por defecto hoy}
+        expirationDate: {type: string, format: date, description: Por defecto entryDate + 30 días}
+        unitCost: {type: number}
+        notes: {type: string}
+    Entry:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        productId: {type: integer}
+        productName: {type: string}
+        supplierId: {type: integer}
+        supplierName: {type: string}
+        lotId: {type: integer}
+        lotNumber: {type: string}
+        quantity: {type: number}
+        entryDate: {type: string, format: date}
+        expirationDate: {type: string, format: date}
+        userId: {type: integer}
+        userName: {type: string}
+        notes: {type: string}
+        createdAt: {type: string, format: date-time}
+    LotUpdate:
+      type: object
+      required: [lotNumber, expirationDate]
+      properties: {lotNumber: {type: string}, expirationDate: {type: string, format: date}, unitCost: {type: number}}
+    Lot:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        lotNumber: {type: string}
+        productId: {type: integer}
+        productCode: {type: string}
+        productName: {type: string}
+        supplierId: {type: integer}
+        supplierName: {type: string}
+        initialQuantity: {type: number}
+        availableQuantity: {type: number}
+        entryDate: {type: string, format: date}
+        expirationDate: {type: string, format: date}
+        unitCost: {type: number}
+        status: {$ref: '#/components/schemas/LotStatus'}
+        daysToExpire: {type: integer}
+    ExitRequest:
+      type: object
+      required: [productId, quantity, reason]
+      properties:
+        productId: {type: integer, format: int64}
+        quantity: {type: number, exclusiveMinimum: 0}
+        reason: {$ref: '#/components/schemas/ExitReason'}
+        exitDate: {type: string, format: date}
+        notes: {type: string}
+    Exit:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        productId: {type: integer}
+        productName: {type: string}
+        quantity: {type: number}
+        reason: {$ref: '#/components/schemas/ExitReason'}
+        notes: {type: string}
+        exitDate: {type: string, format: date}
+        userId: {type: integer}
+        userName: {type: string}
+        createdAt: {type: string, format: date-time}
+        allocations:
+          type: [array, 'null']
+          description: Lotes descontados en orden FIFO (null en listados)
+          items:
+            type: object
+            properties: {lotId: {type: integer}, lotNumber: {type: string}, entryDate: {type: string, format: date}, expirationDate: {type: string, format: date}, quantity: {type: number}}
+    InventoryItem:
+      type: object
+      properties:
+        productId: {type: integer}
+        code: {type: string}
+        name: {type: string}
+        category: {type: string}
+        unit: {type: string}
+        minStock: {type: number}
+        stock: {type: number}
+        expiringQuantity: {type: number}
+        expiredQuantity: {type: number}
+        nearestExpiration: {type: string, format: date}
+        lowStock: {type: boolean}
+        status: {type: string, enum: [GREEN, YELLOW, RED]}
+    AlertResponse:
+      type: object
+      properties:
+        expiringCount: {type: integer}
+        expiredCount: {type: integer}
+        depletedCount: {type: integer}
+        lowStockCount: {type: integer}
+        thresholdDays: {type: integer}
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              type: {type: string, enum: [EXPIRING, EXPIRED, DEPLETED, LOW_STOCK]}
+              severity: {type: string, enum: [GREEN, YELLOW, RED]}
+              productId: {type: integer}
+              productName: {type: string}
+              lotId: {type: integer}
+              lotNumber: {type: string}
+              quantity: {type: number}
+              expirationDate: {type: string, format: date}
+              daysLeft: {type: integer}
+              message: {type: string}
+    Movement:
+      type: object
+      properties:
+        id: {type: integer}
+        type: {type: string, enum: [ENTRY, EXIT]}
+        productId: {type: integer}
+        productName: {type: string}
+        lotId: {type: integer}
+        lotNumber: {type: string}
+        quantity: {type: number}
+        entryId: {type: integer}
+        outputId: {type: integer}
+        detail: {type: string}
+        userId: {type: integer}
+        userName: {type: string}
+        createdAt: {type: string, format: date-time}
+    ProductPage: {$ref: '#/components/schemas/PageOfProduct'}
+    PageOfProduct:
+      allOf: [{$ref: '#/components/schemas/PageBase'}, {type: object, properties: {content: {type: array, items: {$ref: '#/components/schemas/Product'}}}}]
+    SupplierPage:
+      allOf: [{$ref: '#/components/schemas/PageBase'}, {type: object, properties: {content: {type: array, items: {$ref: '#/components/schemas/Supplier'}}}}]
+    LotPage:
+      allOf: [{$ref: '#/components/schemas/PageBase'}, {type: object, properties: {content: {type: array, items: {$ref: '#/components/schemas/Lot'}}}}]
+    EntryPage:
+      allOf: [{$ref: '#/components/schemas/PageBase'}, {type: object, properties: {content: {type: array, items: {$ref: '#/components/schemas/Entry'}}}}]
+    ExitPage:
+      allOf: [{$ref: '#/components/schemas/PageBase'}, {type: object, properties: {content: {type: array, items: {$ref: '#/components/schemas/Exit'}}}}]
+    MovementPage:
+      allOf: [{$ref: '#/components/schemas/PageBase'}, {type: object, properties: {content: {type: array, items: {$ref: '#/components/schemas/Movement'}}}}]
+    UserPage:
+      allOf: [{$ref: '#/components/schemas/PageBase'}, {type: object, properties: {content: {type: array, items: {$ref: '#/components/schemas/User'}}}}]
+    PageBase:
+      type: object
+      properties: {page: {type: integer}, size: {type: integer}, totalElements: {type: integer, format: int64}, totalPages: {type: integer}}

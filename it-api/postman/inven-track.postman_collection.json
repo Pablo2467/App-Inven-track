@@ -1,0 +1,107 @@
+{
+  "info": {
+    "name": "Inven-Track API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "token", "value": "" },
+    { "key": "productId", "value": "" },
+    { "key": "code", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Login dueno",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Login devuelve 200', () => pm.response.to.have.status(200));",
+        "const body = pm.response.json();",
+        "pm.test('Trae un token JWT', () => pm.expect(body.token).to.be.a('string'));",
+        "pm.collectionVariables.set('token', body.token);"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"username\":\"dueno\",\"password\":\"Dueno123*\"}" },
+        "url": "{{baseUrl}}/api/v1/auth/login"
+      }
+    },
+    {
+      "name": "2. Sin token responde 401",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Sin token devuelve 401', () => pm.response.to.have.status(401));"
+      ] } }],
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/v1/products" }
+    },
+    {
+      "name": "3. Crear producto",
+      "event": [
+        { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+          "pm.collectionVariables.set('code', 'PM-' + Date.now().toString().slice(-8));"
+        ] } },
+        { "listen": "test", "script": { "type": "text/javascript", "exec": [
+          "pm.test('Crear devuelve 201', () => pm.response.to.have.status(201));",
+          "pm.collectionVariables.set('productId', pm.response.json().id);"
+        ] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\"code\":\"{{code}}\",\"name\":\"Producto Postman\",\"unit\":\"kg\",\"minStock\":2}" },
+        "url": "{{baseUrl}}/api/v1/products"
+      }
+    },
+    {
+      "name": "4. Listar productos",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Listar devuelve 200', () => pm.response.to.have.status(200));"
+      ] } }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/api/v1/products"
+      }
+    },
+    {
+      "name": "5. Obtener producto",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Obtener devuelve 200', () => pm.response.to.have.status(200));",
+        "pm.test('Es el producto creado', () => pm.expect(pm.response.json().name).to.eql('Producto Postman'));"
+      ] } }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/api/v1/products/{{productId}}"
+      }
+    },
+    {
+      "name": "6. Actualizar producto",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Actualizar devuelve 200', () => pm.response.to.have.status(200));",
+        "pm.test('Nombre actualizado', () => pm.expect(pm.response.json().name).to.eql('Producto Postman editado'));"
+      ] } }],
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\"code\":\"{{code}}\",\"name\":\"Producto Postman editado\",\"unit\":\"kg\",\"minStock\":3}" },
+        "url": "{{baseUrl}}/api/v1/products/{{productId}}"
+      }
+    },
+    {
+      "name": "7. Eliminar producto",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Eliminar devuelve 200', () => pm.response.to.have.status(200));"
+      ] } }],
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/api/v1/products/{{productId}}"
+      }
+    }
+  ]
+}
