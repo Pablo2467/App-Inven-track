@@ -1,0 +1,1585 @@
+openapi: 3.1.0
+
+info:
+  title: Inven-Track
+  x-ibm-name: inven-track
+  version: 1.0.0
+  description: >
+    API para la gestión y control de inventarios de una salsamentaria.
+    Inven-Track permite administrar productos, proveedores, lotes, entradas,
+    salidas, existencias, alertas de vencimiento y trazabilidad de movimientos.
+    El sistema aplica rotación FIFO para las salidas de inventario.
+
+servers:
+  - url: https://{host}/api/v1
+    description: Aplicación Inven-Track, cualquier ambiente
+    variables:
+      host:
+        default: localhost:3000
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /products:
+    get:
+      operationId: listProducts
+      summary: List products
+      description: Consulta paginada de productos registrados en Inven-Track.
+      tags:
+        - Products
+
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - ACTIVE
+              - INACTIVE
+
+      responses:
+        '200':
+          description: Lista de productos
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      operationId: createProduct
+      summary: Register a new product
+      description: Registra un nuevo producto en el inventario.
+      tags:
+        - Products
+
+      parameters:
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewProduct'
+
+      responses:
+        '201':
+          description: Producto creado correctamente
+          headers:
+            Location:
+              description: URL del producto creado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /products/{productId}:
+    get:
+      operationId: getProduct
+      summary: Get product
+      description: Consulta un producto específico mediante su identificador.
+      tags:
+        - Products
+
+      parameters:
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/ProductIdParam'
+
+      responses:
+        '200':
+          description: Producto encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    patch:
+      operationId: updateProduct
+      summary: Update product
+      description: Actualiza parcialmente la información de un producto.
+      tags:
+        - Products
+
+      parameters:
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/ProductIdParam'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProduct'
+
+      responses:
+        '200':
+          description: Producto actualizado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /suppliers:
+    get:
+      operationId: listSuppliers
+      summary: List suppliers
+      description: Consulta paginada de proveedores.
+      tags:
+        - Suppliers
+
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+
+      responses:
+        '200':
+          description: Lista de proveedores
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Supplier'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      operationId: createSupplier
+      summary: Register a new supplier
+      description: Registra un nuevo proveedor.
+      tags:
+        - Suppliers
+
+      parameters:
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewSupplier'
+
+      responses:
+        '201':
+          description: Proveedor creado correctamente
+          headers:
+            Location:
+              description: URL del proveedor creado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /suppliers/{supplierId}:
+    get:
+      operationId: getSupplier
+      summary: Get supplier
+      description: Consulta un proveedor específico.
+      tags:
+        - Suppliers
+
+      parameters:
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/SupplierIdParam'
+
+      responses:
+        '200':
+          description: Proveedor encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    patch:
+      operationId: updateSupplier
+      summary: Update supplier
+      description: Actualiza parcialmente la información de un proveedor.
+      tags:
+        - Suppliers
+
+      parameters:
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/SupplierIdParam'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSupplier'
+
+      responses:
+        '200':
+          description: Proveedor actualizado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /batches:
+    get:
+      operationId: listBatches
+      summary: List batches
+      description: >
+        Consulta los lotes registrados, permitiendo filtrar por producto,
+        proveedor y estado del lote.
+      tags:
+        - Batches
+
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+
+        - name: productId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+
+        - name: supplierId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - AVAILABLE
+              - DEPLETED
+              - EXPIRED
+
+      responses:
+        '200':
+          description: Lista de lotes
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Batch'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /batches/{batchId}:
+    get:
+      operationId: getBatch
+      summary: Get batch
+      description: Consulta un lote específico.
+      tags:
+        - Batches
+
+      parameters:
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/BatchIdParam'
+
+      responses:
+        '200':
+          description: Lote encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Batch'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /inventory:
+    get:
+      operationId: listInventory
+      summary: List inventory
+      description: Consulta las existencias actuales del inventario.
+      tags:
+        - Inventory
+
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+
+      responses:
+        '200':
+          description: Existencias del inventario
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Inventory'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /inventory/{productId}:
+    get:
+      operationId: getInventoryByProduct
+      summary: Get product inventory
+      description: Consulta las existencias de un producto específico.
+      tags:
+        - Inventory
+
+      parameters:
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/ProductIdParam'
+
+      responses:
+        '200':
+          description: Inventario del producto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /stock-entries:
+    post:
+      operationId: createStockEntry
+      summary: Register stock entry
+      description: >
+        Registra una entrada de inventario, genera el lote correspondiente,
+        actualiza las existencias y registra el movimiento de entrada para
+        mantener la trazabilidad del inventario.
+      tags:
+        - Inventory
+
+      parameters:
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewStockEntry'
+
+      responses:
+        '201':
+          description: Entrada registrada correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockEntryResponse'
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /stock-exits:
+    post:
+      operationId: createStockExit
+      summary: Register stock exit
+      description: >
+        Registra una salida de inventario aplicando automáticamente
+        la política FIFO sobre los lotes disponibles.
+      tags:
+        - Inventory
+
+      parameters:
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewStockExit'
+
+      responses:
+        '201':
+          description: Salida registrada correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockExitResponse'
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /expiration-alerts:
+    get:
+      operationId: listExpirationAlerts
+      summary: List expiration alerts
+      description: >
+        Consulta productos y lotes próximos a vencer o que ya se encuentran
+        vencidos.
+      tags:
+        - Alerts
+
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+
+        - name: days
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 30
+
+        - name: productId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+
+      responses:
+        '200':
+          description: Alertas de vencimiento
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExpirationAlert'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /movements:
+    get:
+      operationId: listMovements
+      summary: List inventory movements
+      description: Consulta el historial y trazabilidad de movimientos.
+      tags:
+        - Movements
+
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+
+        - name: productId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+
+        - name: batchId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - ENTRY
+              - EXIT
+
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+
+      responses:
+        '200':
+          description: Movimientos de inventario
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Movement'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /movements/{movementId}:
+    get:
+      operationId: getMovement
+      summary: Get inventory movement
+      description: Consulta el detalle de un movimiento.
+      tags:
+        - Movements
+
+      parameters:
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/MovementIdParam'
+
+      responses:
+        '200':
+          description: Movimiento encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movement'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /users:
+    get:
+      operationId: listUsers
+      summary: List users
+      description: Consulta paginada de usuarios del sistema.
+      tags:
+        - Users
+
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+
+      responses:
+        '200':
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      operationId: createUser
+      summary: Register a new user
+      description: Registra un nuevo usuario.
+      tags:
+        - Users
+
+      parameters:
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewUser'
+
+      responses:
+        '201':
+          description: Usuario creado correctamente
+          headers:
+            Location:
+              description: URL del usuario creado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /users/{userId}:
+    get:
+      operationId: getUser
+      summary: Get user
+      description: Consulta un usuario específico.
+      tags:
+        - Users
+
+      parameters:
+        - $ref: '#/components/parameters/XRqUID'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XClientDt'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/UserIdParam'
+
+      responses:
+        '200':
+          description: Usuario encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+components:
+
+  parameters:
+
+    PageParam:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    ProductIdParam:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int32
+
+    SupplierIdParam:
+      name: supplierId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int32
+
+    BatchIdParam:
+      name: batchId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int32
+
+    MovementIdParam:
+      name: movementId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int32
+
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int32
+
+    XRqUID:
+      name: X-RqUID
+      in: header
+      required: true
+      schema:
+        type: string
+
+    XChannel:
+      name: X-Channel
+      in: header
+      required: true
+      schema:
+        type: string
+
+    XClientDt:
+      name: X-ClientDt
+      in: header
+      required: true
+      schema:
+        type: string
+        format: date-time
+
+    XUserId:
+      name: X-User-Id
+      in: header
+      required: true
+      schema:
+        type: integer
+        format: int32
+
+
+  schemas:
+
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - category
+        - unitOfMeasure
+        - salePrice
+        - minimumStock
+        - status
+      properties:
+        id:
+          type: integer
+          format: int32
+        name:
+          type: string
+        category:
+          type: string
+        unitOfMeasure:
+          type: string
+        salePrice:
+          type: number
+          format: double
+          minimum: 0
+        minimumStock:
+          type: number
+          format: double
+          minimum: 0
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
+        creationDate:
+          type: string
+          format: date-time
+        updateDate:
+          type: string
+          format: date-time
+
+
+    NewProduct:
+      type: object
+      required:
+        - name
+        - category
+        - unitOfMeasure
+        - salePrice
+        - minimumStock
+      properties:
+        name:
+          type: string
+          minLength: 1
+        category:
+          type: string
+          minLength: 1
+        unitOfMeasure:
+          type: string
+          minLength: 1
+        salePrice:
+          type: number
+          format: double
+          minimum: 0
+        minimumStock:
+          type: number
+          format: double
+          minimum: 0
+
+
+    UpdateProduct:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        unitOfMeasure:
+          type: string
+        salePrice:
+          type: number
+          format: double
+          minimum: 0
+        minimumStock:
+          type: number
+          format: double
+          minimum: 0
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
+
+
+    Supplier:
+      type: object
+      required:
+        - id
+        - name
+        - identification
+        - status
+      properties:
+        id:
+          type: integer
+          format: int32
+        name:
+          type: string
+        identification:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
+
+
+    NewSupplier:
+      type: object
+      required:
+        - name
+        - identification
+      properties:
+        name:
+          type: string
+          minLength: 1
+        identification:
+          type: string
+          minLength: 1
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+
+
+    UpdateSupplier:
+      type: object
+      properties:
+        name:
+          type: string
+        identification:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
+
+
+    Batch:
+      type: object
+      required:
+        - id
+        - batchCode
+        - productId
+        - supplierId
+        - initialQuantity
+        - availableQuantity
+        - entryDate
+        - expirationDate
+        - purchasePrice
+        - status
+      properties:
+        id:
+          type: integer
+          format: int32
+        batchCode:
+          type: string
+        productId:
+          type: integer
+          format: int32
+        supplierId:
+          type: integer
+          format: int32
+        initialQuantity:
+          type: number
+          format: double
+          minimum: 0
+        availableQuantity:
+          type: number
+          format: double
+          minimum: 0
+        entryDate:
+          type: string
+          format: date-time
+        expirationDate:
+          type: string
+          format: date-time
+        purchasePrice:
+          type: number
+          format: double
+          minimum: 0
+        status:
+          type: string
+          enum:
+            - AVAILABLE
+            - DEPLETED
+            - EXPIRED
+
+
+    Inventory:
+      type: object
+      required:
+        - productId
+        - totalStock
+        - minimumStock
+        - lowStock
+      properties:
+        productId:
+          type: integer
+          format: int32
+        product:
+          type: string
+        unitOfMeasure:
+          type: string
+        totalStock:
+          type: number
+          format: double
+          minimum: 0
+        minimumStock:
+          type: number
+          format: double
+          minimum: 0
+        lowStock:
+          type: boolean
+        activeBatches:
+          type: integer
+          minimum: 0
+        batches:
+          type: array
+          items:
+            $ref: '#/components/schemas/Batch'
+
+
+    NewStockEntry:
+      type: object
+      required:
+        - productId
+        - supplierId
+        - quantity
+        - entryDate
+        - expirationDate
+        - purchasePrice
+      properties:
+        productId:
+          type: integer
+          format: int32
+        supplierId:
+          type: integer
+          format: int32
+        batchCode:
+          type: string
+          description: Código del lote. Si no se proporciona, el sistema puede generarlo.
+        quantity:
+          type: number
+          format: double
+          minimum: 0
+        entryDate:
+          type: string
+          format: date-time
+        expirationDate:
+          type: string
+          format: date-time
+        purchasePrice:
+          type: number
+          format: double
+          minimum: 0
+        observation:
+          type: string
+
+
+    StockEntryResponse:
+      type: object
+      required:
+        - entryId
+        - batch
+        - movement
+      properties:
+        entryId:
+          type: integer
+          format: int32
+        batch:
+          $ref: '#/components/schemas/Batch'
+        movement:
+          $ref: '#/components/schemas/Movement'
+
+
+    NewStockExit:
+      type: object
+      required:
+        - productId
+        - quantity
+        - reason
+      properties:
+        productId:
+          type: integer
+          format: int32
+        quantity:
+          type: number
+          format: double
+          minimum: 0
+        reason:
+          type: string
+          minLength: 1
+        observation:
+          type: string
+
+
+    StockExitResponse:
+      type: object
+      required:
+        - exitId
+        - productId
+        - quantity
+        - affectedBatches
+        - movement
+      properties:
+        exitId:
+          type: integer
+          format: int32
+        productId:
+          type: integer
+          format: int32
+        quantity:
+          type: number
+          format: double
+          minimum: 0
+        affectedBatches:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchExit'
+        movement:
+          $ref: '#/components/schemas/Movement'
+
+
+    BatchExit:
+      type: object
+      required:
+        - batchId
+        - batchCode
+        - quantity
+      properties:
+        batchId:
+          type: integer
+          format: int32
+        batchCode:
+          type: string
+        quantity:
+          type: number
+          format: double
+          minimum: 0
+
+
+    Movement:
+      type: object
+      required:
+        - id
+        - type
+        - productId
+        - quantity
+        - date
+        - userId
+      properties:
+        id:
+          type: integer
+          format: int32
+        type:
+          type: string
+          enum:
+            - ENTRY
+            - EXIT
+        productId:
+          type: integer
+          format: int32
+        batchId:
+          type: integer
+          format: int32
+        quantity:
+          type: number
+          format: double
+          minimum: 0
+        date:
+          type: string
+          format: date-time
+        userId:
+          type: integer
+          format: int32
+        reason:
+          type: string
+        observation:
+          type: string
+
+
+    ExpirationAlert:
+      type: object
+      required:
+        - productId
+        - batchId
+        - expirationDate
+        - daysToExpire
+        - level
+      properties:
+        productId:
+          type: integer
+          format: int32
+        product:
+          type: string
+        batchId:
+          type: integer
+          format: int32
+        batchCode:
+          type: string
+        availableQuantity:
+          type: number
+          format: double
+          minimum: 0
+        expirationDate:
+          type: string
+          format: date-time
+        daysToExpire:
+          type: integer
+          format: int32
+        level:
+          type: string
+          enum:
+            - HIGH
+            - MEDIUM
+            - LOW
+            - EXPIRED
+
+
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - role
+        - status
+      properties:
+        id:
+          type: integer
+          format: int32
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum:
+            - ADMINISTRATOR
+            - OPERATOR
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
+
+
+    NewUser:
+      type: object
+      required:
+        - name
+        - email
+        - role
+      properties:
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum:
+            - ADMINISTRATOR
+            - OPERATOR
+
+
+    PaginationMeta:
+      type: object
+      required:
+        - page
+        - limit
+        - total
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Código de error estable para consumo de la aplicación.
+          examples:
+            - VALIDATION_ERROR
+        message:
+          type: string
+          examples:
+            - El producto no existe.
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+
+  responses:
+
+    BadRequest:
+      description: La solicitud es incorrecta o incumple una regla de negocio.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: No se proporcionaron credenciales válidas.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: El recurso solicitado no fue encontrado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Conflict:
+      description: La operación genera un conflicto con el estado actual del recurso.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    InternalError:
+      description: Error inesperado del servidor.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+
+  securitySchemes:
+
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
